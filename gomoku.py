@@ -20,6 +20,7 @@ class Gomoku:
             3 |_|_|_|_| ...
             y  . . . . 
 
+        episode: list of (x, y). Moves played so far.
         finished: boolean. 'True' if game is finished, 'False' otherwise.
         winner: int. '1' if first player won, '-1' if second player won, '0' otherwise.
 
@@ -29,19 +30,20 @@ class Gomoku:
             Returns array of boolean values indicating valid moves. 
 
         play(x: int, y: int)
-            Play a move/action at coordinates (x, y). Automatically alternates
+            Play a move at coordinates (x, y). Automatically alternates
             between first and second players.
 
         find_winner(x: int, y: int) -> int
-            Computes and returns the 'winner' variable from most recent move (x, y).
+            Computes and returns the 'winner' variable, based on most recent move (x, y).
 
-        print()
+        show()
             Print board. 
     '''
 
     def __init__(self, size=15):
         self.size = size
         self.board = np.zeros((size, size), dtype=np.int8)
+        self.episode = []
         self.finished = False
         self.winner = 0
         self._curr_player = +1
@@ -53,6 +55,7 @@ class Gomoku:
         assert not self.finished, "game has ended"
         assert self.board[x, y] == 0, "invalid move"
         self.board[x, y] = self._curr_player
+        self.episode.append((x, y))
         self._curr_player *= -1
         ## game ends when there is a winner
         self.winner = self.find_winner(x, y)
@@ -60,43 +63,41 @@ class Gomoku:
             self.finished = True
 
     def find_winner(self, x, y):
+        ## look in all directions to see if (x, y) is contained in a 5-chain.
         piece = self.board[x, y]
-        ## look left-right
+        ## left-right
         i, j = 0, 0
-        while x-i >= 1 and self.board[x-i-1, y] == piece:
-            i += 1
-        while x+j <= self.size-2 and self.board[x+j+1, y] == piece:
-            j += 1
-        if i+j+1 >= 5:
-            return piece
-        ## look up-down
+        while x-i-1 >= 0 and self.board[x-i-1, y] == piece: i += 1
+        while x+j+1 < self.size and self.board[x+j+1, y] == piece: j += 1
+        if i+j+1 >= 5: return piece
+        ## up-down
         i, j = 0, 0
-        while y-i >= 1 and self.board[x, y-i-1] == piece:
-            i += 1
-        while y+j <= self.size-2 and self.board[x, y+j+1] == piece:
-            j += 1
-        if i+j+1 >= 5:
-            return piece
-        ## look NW-SE
+        while y-i-1 >= 0 and self.board[x, y-i-1] == piece: i += 1
+        while y+j+1 < self.size and self.board[x, y+j+1] == piece: j += 1
+        if i+j+1 >= 5: return piece
+        ## NW-SE
         i, j = 0, 0
-        while x-i >= 1 and y-i >= 1 and self.board[x-i-1, y-i-1] == piece:
-            i += 1
-        while x+j <= self.size-2 and y+j <= self.size-2 and self.board[x+j+1, y+j+1] == piece:
-            j += 1
-        if i+j+1 >= 5:
-            return piece
-        ## look NE-SW
+        while x-i-1 >= 0 and y-i-1 >= 0 and self.board[x-i-1, y-i-1] == piece: i += 1
+        while x+j+1 < self.size and y+j+1 < self.size and self.board[x+j+1, y+j+1] == piece: j += 1
+        if i+j+1 >= 5: return piece
+        ## NE-SW
         i, j = 0, 0
-        while x-i >= 1 and y+i <= self.size-2 and self.board[x-i-1, y+i+1] == piece:
-            i += 1
-        while x+j <= self.size-2 and y-j >= 1 and self.board[x+j+1, y-j-1] == piece:
-            j += 1
-        if i+j+1 >= 5:
-            return piece
+        while x+i+1 < self.size and y-i-1 >= 0 and self.board[x+i+1, y-i-1] == piece: i += 1
+        while x-j-1 >= 0 and y+j+1 < self.size and self.board[x-j-1, y+j+1] == piece: j += 1
+        if i+j+1 >= 5: return piece
         return 0
 
-    def print(self):
-        print(self.board.T)
+    def show(self):
+        d = {0:'.', 1:'\u25CF', -1:'\u25CB'}
+        print('  ', end='')
+        for x in range(self.size):
+            print('{0:2d}'.format(x), end='')
+        print()
+        for y in range(self.size):
+            print('{0:2d}'.format(y), end=' ')
+            for x in range(self.size):
+                print(d[self.board[x, y]], end=' ')
+            print()
 
 
 
@@ -110,8 +111,8 @@ class Player:
 
     Methods ============
 
-        play(x: int, y: int, game: Gomoku) -> (int, int)
-            Returns move/action, given previous move (x, y) by opponent and game.
+        play(game: Gomoku) -> (x, y)
+            Returns move to play.
 
         learn(episode: list)
             Learn from episode.
@@ -120,23 +121,9 @@ class Player:
         self.name = name
         self.piece = piece
 
-    def play(self, x, y, game):
+    def play(self, game):
         pass
 
     def learn(self, episode):
         pass
-
-
-
-class RandomPlayer(Player):
-    '''Takes random moves; for playtesting.'''
-    def __init__(self, *args):
-        super().__init__(*args)
-
-    def play(self, x, y, game):
-        actions = np.where(game.available_actions().flatten())[0]
-        move = np.random.choice(actions)
-        return move//game.size, move%game.size
-
-
 
