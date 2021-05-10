@@ -1,8 +1,9 @@
 import numpy as np
+from scipy.special import softmax
 import gomoku
 
 class RandomPlayer(gomoku.Player):
-    '''Takes random moves; for playtesting.'''
+    '''Makes random moves.'''
     def __init__(self, name, piece):
         super().__init__(name, piece)
 
@@ -14,22 +15,38 @@ class RandomPlayer(gomoku.Player):
 
     
 class FeaturePlayer(gomoku.Player):
-    '''Keeps track of the following features:
-     0: Number of 2-chains the move will create.
-     1: "       " 3-chains "                  ".
-     2: "       " 4-chains "                  ".
-     3: "       " 5-chains "                  ".
-     4: Number of opponent 2-chains the move will block.
-     5: "                " 3-chains "                 ".
-     6: "                " 4-chains "                 ".
-     7: "                " 5-chains "                 ".
-     Points are assigned to each feature according to the w vector.
-     Player takes move with maximum points.
+    '''Move according to basic features.
+    
+        get_features() returns a [size, size, 9]-shape array containing 9 features for each position of the board:
+            0: Number of 2-chains the move will create.
+            1: "       " 3-chains "                  ".
+            2: "       " 4-chains "                  ".
+            3: "       " 5-chains "                  ".
+            4: Number of opponent 2-chains the move will block.
+            5: "                " 3-chains "                 ".
+            6: "                " 4-chains "                 ".
+            7: "                " 5-chains "                 ".
+            8: Ones (for bias).
+        The w vector assigns points to each feature, and adds them up. Player makes move with maximum points.
+    
+    Variables ===========
+    
+        name: string. Name of player.
+        piece: int. Either +1 for black or -1 for white.
+        w: array.
+        
+    Methods ============
+    
+        play(game: Gomoku) -> (x, y)
+            Returns move to play.
+    
+        get_features(game: Gomoku) -> array
+            Returns array of features, described above.
     '''
     def __init__(self, name, piece):
         super().__init__(name, piece)
-        ## points assigned to each each feature
-        self.w = np.array([2, 4, 8, 16, 1, 3, 7, 15])
+        ## default points assigned to each each feature
+        self.w = np.array([1, 4, 9, 16, 1, 4, 9, 16, 0])
         
     def play(self, game):
         features = self.get_features(game)
@@ -39,9 +56,10 @@ class FeaturePlayer(gomoku.Player):
         return move//game.size, move%game.size
        
     def get_features(self, game):
-        ## calculate features as described above -- there are lots of cases to check.
+        ## calculate features as described above
         avail_moves = game.available_actions()
-        features = np.zeros((game.size, game.size, 8))
+        features = np.zeros((game.size, game.size, 9))
+        features[..., 8] = 1
         for x in range(game.size):
             for y in range(game.size):
                 if not avail_moves[x, y]:
@@ -121,5 +139,55 @@ class FeaturePlayer(gomoku.Player):
                     features[x, y, min(j+1, 5)+2] += 1
         return features
 
+    
+
+class PGFeaturePlayer(FeaturePlayer):
+    def __init__(self, name, piece, epsilon=.2, w_lr=.1, theta_lr=.1, discount=.8):
+        super().__init__(name, piece)
+        self.epsilon = epsilon
+        self.w_lr = w_lr
+        self.theta_lr = theta_lr
+        self.discount = discount
+        self.w = np.zeros(9)
+        self.theta = np.zeros(9)
+        self.cache = []
+        
+    def play(self, game):
+        avail_moves = game.available_actions()
+        features = self.get_features(game)
+        probs = softmax(features @ self.theta)
+        probs[~avail_moves] = 0 # do not take invalid moves
+        probs = probs.flatten()/np.sum(probs) # re-normalize probabilities
+        ave_features = features.T.reshape(9, -1) @ probs
+        
+        x = np.random.random()
+        ## play random
+        if x < self.epsilon:
+            #print("random")
+            move = np.random.choice(np.where(probs > 0)[0])
+        ## play according to policy
+        else:
+            #print("policy")
+            move = np.random.choice(len(probs), p=probs)
+        x, y = move//game.size, move%game.size
+        self.cache.append((x, y, features[x, y], ave_features)) 
+        return x, y
+    
+    def get_grad(self, game, reward):
+        w_grad = np.zeros_like(self.w)
+        theta_grad = np.zeros_like(self.theta)
+        N = 0.
+        for x, y, phi, ave_phi in self.cache[::-1]:
+            w_grad += (reward - self.w @ phi)*phi
+            theta_grad += (self.w @ phi)*(phi - ave_phi)
+            N += 1
+            reward *= self.discount
+        self.cache = []
+        return w_grad/N, theta_grad/N
+        
+    def step(self, w_grad, theta_grad):
+        self.w += self.w_lr * w_grad
+        self.theta += self.theta_lr * theta_grad
+    
                 
                 

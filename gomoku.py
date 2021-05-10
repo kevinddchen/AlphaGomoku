@@ -10,7 +10,7 @@ class Gomoku:
     Variables ===========
 
         size: int.
-        board: array. Representation of the board. 0=empty, 1=first player, -1=second player.
+        board: array. Representation of the board. 0=empty, 1=black, -1=white.
           
             Uses matrix convention, not Go convention.
                0 1 2 3 x
@@ -22,16 +22,15 @@ class Gomoku:
 
         episode: list of (x, y). Moves played so far.
         finished: boolean. 'True' if game is finished, 'False' otherwise.
-        winner: int. '1' if first player won, '-1' if second player won, '0' otherwise.
+        winner: int. '1' if black won, '-1' if white won, '0' otherwise.
 
     Methods =============
 
-        available_actions() -> 15x15 array
+        available_actions() -> array
             Returns array of boolean values indicating valid moves. 
 
         play(x: int, y: int)
-            Play a move at coordinates (x, y). Automatically alternates
-            between first and second players.
+            Play a move at coordinates (x, y). Automatically alternates between black and white.
 
         find_winner(x: int, y: int) -> int
             Computes and returns the 'winner' variable, based on most recent move (x, y).
@@ -47,6 +46,7 @@ class Gomoku:
         self.finished = False
         self.winner = 0
         self._curr_player = +1
+        self._moves_left = size*size
 
     def available_actions(self):
         return self.board == 0
@@ -57,6 +57,10 @@ class Gomoku:
         self.board[x, y] = self._curr_player
         self.episode.append((x, y))
         self._curr_player *= -1
+        self._moves_left -= 1
+        ## game ends when all spaces filled
+        if self._moves_left == 0:
+            self.finished = True
         ## game ends when there is a winner
         self.winner = self.find_winner(x, y)
         if self.winner != 0:
@@ -88,7 +92,7 @@ class Gomoku:
         return 0
 
     def show(self):
-        d = {0:'.', 1:'\u25CF', -1:'\u25CB'}
+        pieces = {0:'.', 1:'\u25CF', -1:'\u25CB'}
         print('  ', end='')
         for x in range(self.size):
             print('{0:2d}'.format(x), end='')
@@ -96,7 +100,7 @@ class Gomoku:
         for y in range(self.size):
             print('{0:2d}'.format(y), end=' ')
             for x in range(self.size):
-                print(d[self.board[x, y]], end=' ')
+                print(pieces[self.board[x, y]], end=' ')
             print()
 
 
@@ -107,23 +111,17 @@ class Player:
     Parameters =========
 
         name: string. Name of player.
-        piece: int. Either +1 for first player or -1 for second player.
+        piece: int. Either +1 for black or -1 for white.
 
     Methods ============
 
         play(game: Gomoku) -> (x, y)
             Returns move to play.
-
-        learn(episode: list)
-            Learn from episode.
     '''
     def __init__(self, name, piece):
         self.name = name
         self.piece = piece
 
     def play(self, game):
-        pass
-
-    def learn(self, episode):
         pass
 
