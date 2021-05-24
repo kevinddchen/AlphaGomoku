@@ -141,53 +141,56 @@ class FeaturePlayer(gomoku.Player):
 
     
 
-class PGFeaturePlayer(FeaturePlayer):
-    def __init__(self, name, piece, epsilon=.2, w_lr=.1, theta_lr=.1, discount=.8):
-        super().__init__(name, piece)
-        self.epsilon = epsilon
-        self.w_lr = w_lr
-        self.theta_lr = theta_lr
-        self.discount = discount
-        self.w = np.zeros(9)
-        self.theta = np.zeros(9)
-        self.cache = []
-        
-    def play(self, game):
-        avail_moves = game.available_actions()
-        features = self.get_features(game)
-        probs = softmax(features @ self.theta)
-        probs[~avail_moves] = 0 # do not take invalid moves
-        probs = probs.flatten()/np.sum(probs) # re-normalize probabilities
-        ave_features = features.T.reshape(9, -1) @ probs
-        
-        x = np.random.random()
-        ## play random
-        if x < self.epsilon:
-            #print("random")
-            move = np.random.choice(np.where(probs > 0)[0])
-        ## play according to policy
-        else:
-            #print("policy")
-            move = np.random.choice(len(probs), p=probs)
-        x, y = move//game.size, move%game.size
-        self.cache.append((x, y, features[x, y], ave_features)) 
-        return x, y
+# class PGFeaturePlayer(FeaturePlayer):
+#     '''Tries to learn by actor-critic policy gradient. Uses linear function 
+#     approximation given by the features of Feature Player. Does not really work.'''
     
-    def get_grad(self, game, reward):
-        w_grad = np.zeros_like(self.w)
-        theta_grad = np.zeros_like(self.theta)
-        N = 0.
-        for x, y, phi, ave_phi in self.cache[::-1]:
-            w_grad += (reward - self.w @ phi)*phi
-            theta_grad += (self.w @ phi)*(phi - ave_phi)
-            N += 1
-            reward *= self.discount
-        self.cache = []
-        return w_grad/N, theta_grad/N
+#     def __init__(self, name, piece, epsilon=.2, w_lr=.1, theta_lr=.1, discount=.8):
+#         super().__init__(name, piece)
+#         self.epsilon = epsilon
+#         self.w_lr = w_lr
+#         self.theta_lr = theta_lr
+#         self.discount = discount
+#         self.w = np.zeros(9)
+#         self.theta = np.zeros(9)
+#         self.cache = []
         
-    def step(self, w_grad, theta_grad):
-        self.w += self.w_lr * w_grad
-        self.theta += self.theta_lr * theta_grad
+#     def play(self, game):
+#         avail_moves = game.available_actions()
+#         features = self.get_features(game)
+#         probs = softmax(features @ self.theta)
+#         probs[~avail_moves] = 0 # do not take invalid moves
+#         probs = probs.flatten()/np.sum(probs) # re-normalize probabilities
+#         ave_features = features.T.reshape(9, -1) @ probs
+        
+#         x = np.random.random()
+#         ## play random
+#         if x < self.epsilon:
+#             #print("random")
+#             move = np.random.choice(np.where(probs > 0)[0])
+#         ## play according to policy
+#         else:
+#             #print("policy")
+#             move = np.random.choice(len(probs), p=probs)
+#         x, y = move//game.size, move%game.size
+#         self.cache.append((x, y, features[x, y], ave_features)) 
+#         return x, y
+    
+#     def get_grad(self, game, reward):
+#         w_grad = np.zeros_like(self.w)
+#         theta_grad = np.zeros_like(self.theta)
+#         N = 0.
+#         for x, y, phi, ave_phi in self.cache[::-1]:
+#             w_grad += (reward - self.w @ phi)*phi
+#             theta_grad += (self.w @ phi)*(phi - ave_phi)
+#             N += 1
+#             reward *= self.discount
+#         self.cache = []
+#         return w_grad/N, theta_grad/N
+        
+#     def step(self, w_grad, theta_grad):
+#         self.w += self.w_lr * w_grad
+#         self.theta += self.theta_lr * theta_grad
     
                 
                 
