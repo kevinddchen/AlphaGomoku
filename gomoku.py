@@ -10,7 +10,7 @@ class Gomoku:
     Variables ===========
 
         size: int.
-        board: array. Representation of the board. 0=empty, 1=black, -1=white.
+        board: array. Numerical representation of the board: 0=empty, 1=black, -1=white.
           
             Uses matrix convention, not Go convention.
                0 1 2 3 x
@@ -20,17 +20,24 @@ class Gomoku:
             3 |_|_|_|_| ...
             y  . . . . 
 
-        episode: list of (x, y). Moves played so far.
+        episode: list of tuples (x, y). Moves played so far.
         finished: boolean. 'True' if game is finished, 'False' otherwise.
         winner: int. '1' if black won, '-1' if white won, '0' otherwise.
 
     Methods =============
 
-        available_actions() -> array
-            Returns array of boolean values indicating valid moves. 
-
         play(x: int, y: int)
             Play a move at coordinates (x, y). Automatically alternates between black and white.
+            
+        available_actions() -> array
+            Returns 2D array of boolean values indicating valid moves. 
+            
+        available_actions_list() -> array
+            Returns 1D array of valid moves, in flattended form: move = x*size + y. 
+            
+        forbidden_actions() -> array
+        
+        forbidden_actions_list() -> array
 
         find_winner(x: int, y: int) -> int
             Computes and returns the 'winner' variable, based on most recent move (x, y).
@@ -47,10 +54,7 @@ class Gomoku:
         self.winner = 0
         self._curr_player = +1
         self._moves_left = size*size
-
-    def available_actions(self):
-        return self.board == 0
-
+        
     def play(self, x, y):
         assert not self.finished, "game has ended"
         assert self.board[x, y] == 0, "invalid move"
@@ -65,6 +69,18 @@ class Gomoku:
         self.winner = self.find_winner(x, y)
         if self.winner != 0:
             self.finished = True
+
+    def available_actions(self):
+        return self.board == 0
+    
+    def available_actions_list(self):
+        return np.where(self.available_actions().flatten())[0]
+    
+    def forbidden_actions(self):
+        return self.board != 0
+    
+    def forbidden_actions_list(self):
+        return np.where(self.forbidden_actions().flatten())[0]
 
     def find_winner(self, x, y):
         ## look in all directions to see if (x, y) is contained in a 5-chain.
@@ -93,12 +109,22 @@ class Gomoku:
 
     def show(self):
         pieces = {0:'.', 1:'\u25CF', -1:'\u25CB'}
-        print('  ', end='')
+        colors = {0: "none", 1:"black", -1:"white"}
+        ## print recent moves
+        if len(self.episode) >= 2:
+            print("{0:s} played {1}.".format(colors[self._curr_player], self.episode[-2]))
+        if len(self.episode) >= 1:
+            print("{0:s} played {1}.".format(colors[-self._curr_player], self.episode[-1]))
+        ## print if game has ended
+        if self.finished:
+            print("game has ended. winner: {0:s}".format(colors[self.winner]))
+        ## print board
+        print("  ", end='')
         for x in range(self.size):
-            print('{0:2d}'.format(x), end='')
+            print("{0:2d}".format(x), end='')
         print()
         for y in range(self.size):
-            print('{0:2d}'.format(y), end=' ')
+            print("{0:2d}".format(y), end=' ')
             for x in range(self.size):
                 print(pieces[self.board[x, y]], end=' ')
             print()

@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.special import softmax
 import gomoku
 
 class RandomPlayer(gomoku.Player):
@@ -8,8 +7,8 @@ class RandomPlayer(gomoku.Player):
         super().__init__(name, piece)
 
     def play(self, game):
-        actions = np.where(game.available_actions().flatten())[0]
-        move = np.random.choice(actions)
+        avail_acts = game.available_actions_list()
+        move = np.random.choice(avail_acts)
         return move//game.size, move%game.size
     
 
@@ -49,21 +48,27 @@ class FeaturePlayer(gomoku.Player):
         self.w = np.array([1, 4, 9, 16, 1, 4, 9, 16, 0])
         
     def play(self, game):
+        ## first move?
+        if not game.episode:
+            return (game.size-1)//2, (game.size-1)//2
         features = self.get_features(game)
-        scores = features.dot(self.w)
-        actions = np.where((scores == np.max(scores)).flatten())[0]
-        move = np.random.choice(actions)
+        scores = features.dot(self.w).flatten()
+        ## mark forbidden moves
+        forbid_acts = game.forbidden_actions_list()
+        scores[forbid_acts] = np.min(scores) - 1
+        ## pick move with max score
+        actions = np.where(scores == np.max(scores))[0]
+        move = np.random.choice(actions) # move = x*size + y
         return move//game.size, move%game.size
        
     def get_features(self, game):
         ## calculate features as described above
-        avail_moves = game.available_actions()
+        avail_acts = game.available_actions()
         features = np.zeros((game.size, game.size, 9))
         features[..., 8] = 1
         for x in range(game.size):
             for y in range(game.size):
-                if not avail_moves[x, y]:
-                    features[x, y] = -1
+                if not avail_acts[x, y]:
                     continue
                 ## left-right
                 i, j = 0, 0
