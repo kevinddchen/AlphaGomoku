@@ -23,6 +23,7 @@ class Gomoku:
         episode: list of tuples (x, y). Moves played so far.
         finished: boolean. 'True' if game is finished, 'False' otherwise.
         winner: int. '1' if black won, '-1' if white won, '0' otherwise.
+        curr_player: int. Current player.
 
     Methods =============
 
@@ -44,6 +45,9 @@ class Gomoku:
 
         show()
             Print board. 
+            
+        copy() -> Gomoku
+            Returns copied instance of Gomoku game.
     '''
 
     def __init__(self, size=15):
@@ -52,18 +56,16 @@ class Gomoku:
         self.episode = []
         self.finished = False
         self.winner = 0
-        self._curr_player = +1
-        self._moves_left = size*size
+        self.curr_player = +1
         
     def play(self, x, y):
         assert not self.finished, "game has ended"
         assert self.board[x, y] == 0, "invalid move"
-        self.board[x, y] = self._curr_player
+        self.board[x, y] = self.curr_player
         self.episode.append((x, y))
-        self._curr_player *= -1
-        self._moves_left -= 1
+        self.curr_player *= -1
         ## game ends when all spaces filled
-        if self._moves_left == 0:
+        if np.sum(self.available_actions()) == 0:
             self.finished = True
         ## game ends when there is a winner
         self.winner = self.find_winner(x, y)
@@ -112,9 +114,9 @@ class Gomoku:
         colors = {0: "none", 1:"black", -1:"white"}
         ## print recent moves
         if len(self.episode) >= 2:
-            print("{0:s} played {1}.".format(colors[self._curr_player], self.episode[-2]))
+            print("{0:s} played {1}.".format(colors[self.curr_player], self.episode[-2]))
         if len(self.episode) >= 1:
-            print("{0:s} played {1}.".format(colors[-self._curr_player], self.episode[-1]))
+            print("{0:s} played {1}.".format(colors[-self.curr_player], self.episode[-1]))
         ## print if game has ended
         if self.finished:
             print("game has ended. winner: {0:s}".format(colors[self.winner]))
@@ -128,6 +130,15 @@ class Gomoku:
             for x in range(self.size):
                 print(pieces[self.board[x, y]], end=' ')
             print()
+            
+    def copy(self):
+        new_game = Gomoku(self.size)
+        new_game.board = np.copy(self.board)
+        new_game.episode = self.episode[:]
+        new_game.finished = self.finished
+        new_game.winner = self.winner
+        new_game.curr_player = self.curr_player
+        return new_game
 
 
 

@@ -39,19 +39,19 @@ class FeaturePlayer(gomoku.Player):
         play(game: Gomoku) -> (x, y)
             Returns move to play.
     
-        get_features(game: Gomoku) -> array
+        get_features(board: array, piece: int) -> array
             Returns array of features, described above.
     '''
     def __init__(self, name, piece):
         super().__init__(name, piece)
         ## default points assigned to each each feature
-        self.w = np.array([1, 4, 9, 16, 1, 4, 9, 16, 0])
+        self.w = np.array([1, 3, 9, 81, 1, 3, 9, 27, 0])
         
     def play(self, game):
         ## first move?
         if not game.episode:
             return (game.size-1)//2, (game.size-1)//2
-        features = self.get_features(game)
+        features = self.get_features(game.board, self.piece)
         scores = features.dot(self.w).flatten()
         ## mark forbidden moves
         forbid_acts = game.forbidden_actions_list()
@@ -61,91 +61,89 @@ class FeaturePlayer(gomoku.Player):
         move = np.random.choice(actions) # move = x*size + y
         return move//game.size, move%game.size
        
-    def get_features(self, game):
+    def get_features(self, board, piece):
         ## calculate features as described above
-        avail_acts = game.available_actions()
-        features = np.zeros((game.size, game.size, 9))
+        size = len(board)
+        features = np.zeros((size, size, 9))
         features[..., 8] = 1
-        for x in range(game.size):
-            for y in range(game.size):
-                if not avail_acts[x, y]:
-                    continue
+        for x in range(size):
+            for y in range(size):
                 ## left-right
                 i, j = 0, 0
-                p_i = game.board[x-1, y] if x-1 >= 0 else 0
-                p_j = game.board[x+1, y] if x+1 < game.size else 0
-                while p_i != 0 and x-i-1 >= 0 and game.board[x-i-1, y] == p_i: i += 1
-                while p_j != 0 and x+j+1 < game.size and game.board[x+j+1, y] == p_j: j += 1
-                if p_i == self.piece and p_j == self.piece:
+                p_i = board[x-1, y] if x-1 >= 0 else 0
+                p_j = board[x+1, y] if x+1 < size else 0
+                while p_i != 0 and x-i-1 >= 0 and board[x-i-1, y] == p_i: i += 1
+                while p_j != 0 and x+j+1 < size and board[x+j+1, y] == p_j: j += 1
+                if p_i == piece and p_j == piece:
                     features[x, y, min(i+j+1, 5)-2] += 1
-                elif p_i == self.piece:
+                elif p_i == piece:
                     features[x, y, min(i+1, 5)-2] += 1
-                elif p_j == self.piece:
+                elif p_j == piece:
                     features[x, y, min(j+1, 5)-2] += 1
-                if p_i == -self.piece and p_j == -self.piece:
+                if p_i == -piece and p_j == -piece:
                     features[x, y, min(i+j+1, 5)+2] += 1
-                elif p_i == -self.piece:
+                elif p_i == -piece:
                     features[x, y, min(i+1, 5)+2] += 1
-                elif p_j == -self.piece:
+                elif p_j == -piece:
                     features[x, y, min(j+1, 5)+2] += 1
                 ## up-down
                 i, j = 0, 0
-                p_i = game.board[x, y-1] if y-1 >= 0 else 0
-                p_j = game.board[x, y+1] if y+1 < game.size else 0
-                while p_i != 0 and y-i-1 >= 0 and game.board[x, y-i-1] == p_i: i += 1
-                while p_j != 0 and y+j+1 < game.size and game.board[x, y+j+1] == p_j: j += 1
-                if p_i == self.piece and p_j == self.piece:
+                p_i = board[x, y-1] if y-1 >= 0 else 0
+                p_j = board[x, y+1] if y+1 < size else 0
+                while p_i != 0 and y-i-1 >= 0 and board[x, y-i-1] == p_i: i += 1
+                while p_j != 0 and y+j+1 < size and board[x, y+j+1] == p_j: j += 1
+                if p_i == piece and p_j == piece:
                     features[x, y, min(i+j+1, 5)-2] += 1
-                elif p_i == self.piece:
+                elif p_i == piece:
                     features[x, y, min(i+1, 5)-2] += 1
-                elif p_j == self.piece:
+                elif p_j == piece:
                     features[x, y, min(j+1, 5)-2] += 1
-                if p_i == -self.piece and p_j == -self.piece:
+                if p_i == -piece and p_j == -piece:
                     features[x, y, min(i+j+1, 5)+2] += 1
-                elif p_i == -self.piece:
+                elif p_i == -piece:
                     features[x, y, min(i+1, 5)+2] += 1
-                elif p_j == -self.piece:
+                elif p_j == -piece:
                     features[x, y, min(j+1, 5)+2] += 1
                 ## NW-SE
                 i, j = 0, 0
-                p_i = game.board[x-1, y-1] if (x-1 >= 0 and y-1 >= 0) else 0
-                p_j = game.board[x+1, y+1] if (x+1 < game.size and y+1 < game.size) else 0
-                while p_i != 0 and x-i-1 >= 0 and y-i-1 >= 0 and game.board[x-i-1, y-i-1] == p_i: i += 1
-                while p_j != 0 and x+j+1 < game.size and y+j+1 < game.size and game.board[x+j+1, y+j+1] == p_j: j += 1
-                if p_i == self.piece and p_j == self.piece:
+                p_i = board[x-1, y-1] if (x-1 >= 0 and y-1 >= 0) else 0
+                p_j = board[x+1, y+1] if (x+1 < size and y+1 < size) else 0
+                while p_i != 0 and x-i-1 >= 0 and y-i-1 >= 0 and board[x-i-1, y-i-1] == p_i: i += 1
+                while p_j != 0 and x+j+1 < size and y+j+1 < size and board[x+j+1, y+j+1] == p_j: j += 1
+                if p_i == piece and p_j == piece:
                     features[x, y, min(i+j+1, 5)-2] += 1
-                elif p_i == self.piece:
+                elif p_i == piece:
                     features[x, y, min(i+1, 5)-2] += 1
-                elif p_j == self.piece:
+                elif p_j == piece:
                     features[x, y, min(j+1, 5)-2] += 1
-                if p_i == -self.piece and p_j == -self.piece:
+                if p_i == -piece and p_j == -piece:
                     features[x, y, min(i+j+1, 5)+2] += 1
-                elif p_i == -self.piece:
+                elif p_i == -piece:
                     features[x, y, min(i+1, 5)+2] += 1
-                elif p_j == -self.piece:
+                elif p_j == -piece:
                     features[x, y, min(j+1, 5)+2] += 1
                 ## NE-SW
                 i, j = 0, 0
-                p_i = game.board[x+1, y-1] if (x+1 < game.size and y-1 >= 0) else 0
-                p_j = game.board[x-1, y+1] if (x-1 >= 0 and y+1 < game.size) else 0
-                while p_i != 0 and x+i+1 < game.size and y-i-1 >= 0 and game.board[x+i+1, y-i-1] == p_i: i += 1
-                while p_j != 0 and x-j-1 >= 0 and y+j+1 < game.size and game.board[x-j-1, y+j+1] == p_j: j += 1
-                if p_i == self.piece and p_j == self.piece:
+                p_i = board[x+1, y-1] if (x+1 < size and y-1 >= 0) else 0
+                p_j = board[x-1, y+1] if (x-1 >= 0 and y+1 < size) else 0
+                while p_i != 0 and x+i+1 < size and y-i-1 >= 0 and board[x+i+1, y-i-1] == p_i: i += 1
+                while p_j != 0 and x-j-1 >= 0 and y+j+1 < size and board[x-j-1, y+j+1] == p_j: j += 1
+                if p_i == piece and p_j == piece:
                     features[x, y, min(i+j+1, 5)-2] += 1
-                elif p_i == self.piece:
+                elif p_i == piece:
                     features[x, y, min(i+1, 5)-2] += 1
-                elif p_j == self.piece:
+                elif p_j == piece:
                     features[x, y, min(j+1, 5)-2] += 1
-                if p_i == -self.piece and p_j == -self.piece:
+                if p_i == -piece and p_j == -piece:
                     features[x, y, min(i+j+1, 5)+2] += 1
-                elif p_i == -self.piece:
+                elif p_i == -piece:
                     features[x, y, min(i+1, 5)+2] += 1
-                elif p_j == -self.piece:
+                elif p_j == -piece:
                     features[x, y, min(j+1, 5)+2] += 1
         return features
-
     
-
+    
+    
 # class PGFeaturePlayer(FeaturePlayer):
 #     '''Tries to learn by actor-critic policy gradient. Uses linear function 
 #     approximation given by the features of Feature Player. Does not really work.'''
