@@ -32,7 +32,7 @@ class FeaturePlayer(gomoku.Player):
     
         name: string. Name of player.
         piece: int. Either +1 for black or -1 for white.
-        w: array.
+        w: array. Points assigned to each feature. Defaults to pre-assigned points.
         
     Methods ============
     
@@ -42,10 +42,13 @@ class FeaturePlayer(gomoku.Player):
         get_features(board: array, piece: int) -> array
             Returns array of features, described above.
     '''
-    def __init__(self, name, piece):
+    def __init__(self, name, piece, w=None):
         super().__init__(name, piece)
-        ## default points assigned to each each feature
-        self.w = np.array([1, 3, 9, 81, 1, 3, 9, 27, 0])
+        if not w:
+            ## default points assigned to each each feature
+            self.w = np.array([1, 3, 9, 81, 1, 3, 9, 27, 0])
+        else:
+            self.w = w
         
     def play(self, game):
         ## first move?
@@ -62,7 +65,6 @@ class FeaturePlayer(gomoku.Player):
         return move//game.size, move%game.size
        
     def get_features(self, board, piece):
-        ## calculate features as described above
         size = len(board)
         features = np.zeros((size, size, 9))
         features[..., 8] = 1
