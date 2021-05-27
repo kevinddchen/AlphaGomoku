@@ -34,7 +34,7 @@ class Gomoku:
             Returns 2D array of boolean values indicating valid moves. 
             
         available_actions_list() -> array
-            Returns 1D array of valid moves, in flattended form: move = x*size + y. 
+            Returns 1D array of valid moves, in flattened form: move = x*size + y. 
             
         forbidden_actions() -> array
         
@@ -120,6 +120,8 @@ class Gomoku:
         ## print if game has ended
         if self.finished:
             print("game has ended. winner: {0:s}".format(colors[self.winner]))
+        else:
+            print("{0:s}'s turn.".format(colors[self.curr_player]))
         ## print board
         print("  ", end='')
         for x in range(self.size):
