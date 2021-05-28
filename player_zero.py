@@ -6,7 +6,7 @@ import tensorflow.keras as keras
 import gomoku
 
 def net(size, l2=1e-4):
-    ''' Neural network for computing policy and value. '''
+    ''' Neural network that computes policy and value. '''
     input_layer = keras.Input(shape=(size, size, 1), name='input')
     x = keras.layers.Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu', 
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv1')(input_layer)
@@ -31,6 +31,33 @@ def net(size, l2=1e-4):
 
     
 class ZeroPlayer(gomoku.Player):
+    '''Move according to AlphaGo Zero algorithm.
+    
+    Each time 'play()' is called, a game tree with 400 moves is generated using 'expand()'. Each 'expand()' down the 
+    tree picks moves guided by the NN model. These 400 moves form the policy of the current state, and a move
+    is finally selected. At each move, the (board, policy, value) are cached for training the NN model.
+    
+    Parameters =========
+
+        name: string. Name of player.
+        piece: int. Either +1 for black or -1 for white.
+        game: Gomoku. Instance of new game.
+        model: keras.Model. NN model that guides 'expand()'.
+        recorder: GameRecorder. Object that caches data for NN training. If 'None', then data not cached.
+            Defaults to 'None'.
+
+    Methods ============
+
+        play(game: Gomoku, n_iter: int) -> (x, y)
+            Returns move to play. 'n_iter' is number of expand() to generate in the game tree. Defaults to 400.
+            
+        update(move: int)
+            Update the game tree by one move, where 'move' = x*size + y.
+            
+        expand()
+            Traverse down game tree and add one node.
+    '''
+    
     def __init__(self, name, piece, game, model, recorder=None):
         super().__init__(name, piece)
         self.tree = MCTreeNode(game.copy())
@@ -39,7 +66,7 @@ class ZeroPlayer(gomoku.Player):
         self.recorder = recorder
     
     def play(self, game, n_iter=400):
-        ## update head to current game state
+        ## update tree to current game state
         while len(self.tree.game.episode) < len(game.episode):
             x, y = game.episode[len(self.tree.game.episode) - len(game.episode)]
             self.update(x*game.size + y)
@@ -60,28 +87,24 @@ class ZeroPlayer(gomoku.Player):
         return x, y
     
     def update(self, move):
-        ''' Update tree by one move. '''
-        ## move has not been explored
-        if not self.tree.children[move]:
+        if not self.tree.children[move]: # move has not been explored
             self.tree = MCTreeNode(self.tree.game.copy())
             self.tree.makeMove(move)
             self.tree.evaluate(self.model, self.piece)
-        ## move has been explored
-        else:
+        
+        else: # move has been explored
             self.tree = self.tree.children[move]
             self.tree.parent = None
             
     def expand(self):
-        ''' Traverse down game tree according to PUCT and add a new leaf node. '''
-        ## traverse down
+        ## traverse down and find leaf node
         node = self.tree
         while not node.game.finished:
             move = node.pickMove()
-            #print(move, end=' ')
             if not node.children[move]:
                 leaf = MCTreeNode(node.game.copy(), node)
-                leaf.makeMove(move)
-                leaf.evaluate(self.model, self.piece)
+                leaf.makeMove(move) # pick move that maximizes UCB = Q + U
+                leaf.evaluate(self.model, self.piece) # use NN to evaluate board
                 node.addChild(move, leaf)
                 node = leaf
                 break
@@ -97,6 +120,7 @@ class ZeroPlayer(gomoku.Player):
                 
 
 class MCTreeNode:
+    ''' Custom data structure to handle game tree.'''
     
     def __init__(self, game, parent=None):
         N = game.size**2
@@ -128,7 +152,7 @@ class MCTreeNode:
             self.forbid = self.game.forbidden_actions_list()
         
     def pickMove(self, c=2.5):
-        ''' Pick move using PUCT. '''
+        ''' Pick move using PUCT algorithm. '''
         assert not self.game.finished, "game is finished"
         UCB = self.Q + c * np.sqrt(1+np.sum(self.N)) * self.P / (1+self.N)
         ## forbid moves
@@ -143,6 +167,18 @@ class MCTreeNode:
         
         
 class GameRecorder:
+    ''' Custom object to read/write game data as TFRecords file.
+    
+    To record data:
+        recorder = GameRecorder([filename goes here])
+        recorder.open()
+        [ run games here ]
+        recorder.close()
+    
+    To read data:
+        recorder = GameRecorder([filename goes here])
+        data = recorder.fetch()
+    '''
     
     def __init__(self, filename):
         self.filename = filename
