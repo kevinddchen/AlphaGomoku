@@ -5,12 +5,12 @@ class Gomoku:
 
     Parameters ==========
 
-        size: int. Dimension of board. Default size=15.
+        size (int) ... Dimension of board. Defaults to size=15.
 
     Variables ===========
 
-        size: int.
-        board: array. Numerical representation of the board: 0=empty, 1=black, -1=white.
+        size (int).
+        board (array) ... Numerical representation of the board; 0=empty, 1=black, -1=white.
           
             Uses matrix convention, not Go convention.
                0 1 2 3 x
@@ -20,34 +20,28 @@ class Gomoku:
             3 |_|_|_|_| ...
             y  . . . . 
 
-        episode: list of tuples (x, y). Moves played so far.
-        finished: boolean. 'True' if game is finished, 'False' otherwise.
-        winner: int. '1' if black won, '-1' if white won, '0' otherwise.
-        curr_player: int. Current player.
+        episode (list of tuples (x, y)) ... Moves played so far.
+        finished (boolean) ... 'True' if game is finished, 'False' otherwise.
+        winner (int) ... '1' if black won, '-1' if white won, '0' otherwise.
+        curr_player (int) ... Current player.
 
     Methods =============
 
-        play(x: int, y: int)
-            Play a move at coordinates (x, y). Automatically alternates between black and white.
+        play(x, y) ... Play a move at coordinates (x, y). Automatically alternates between black and white.
             
-        available_actions() -> array
-            Returns 2D array of boolean values indicating valid moves. 
+        available_actions() ... Returns 2D array of boolean values indicating valid moves. 
             
-        available_actions_list() -> array
-            Returns 1D array of valid moves, in flattened form: move = x*size + y. 
+        available_actions_list() ... Returns 1D array of valid moves, in flattened form: move = x*size + y. 
             
-        forbidden_actions() -> array
+        forbidden_actions()
         
-        forbidden_actions_list() -> array
+        forbidden_actions_list()
 
-        find_winner(x: int, y: int) -> int
-            Computes and returns the 'winner' variable, based on most recent move (x, y).
+        find_winner(x, y) ... Computes and returns the 'winner' variable, based on most recent move (x, y).
 
-        show()
-            Print board. 
+        show() ... Print board. 
             
-        copy() -> Gomoku
-            Returns copied instance of Gomoku game.
+        copy() ... Returns copied instance of Gomoku game.
     '''
 
     def __init__(self, size=15):
@@ -149,18 +143,20 @@ class Player:
 
     Parameters =========
 
-        name: string. Name of player.
-        piece: int. Either +1 for black or -1 for white.
+        name (string) ... Name of player.
+        piece (int) ... Either +1 for black or -1 for white.
 
     Methods ============
 
-        play(game: Gomoku) -> (x, y)
-            Returns move to play.
+        play(game) ... Given Gomoku game, returns move (x, y) to play.
     '''
     def __init__(self, name, piece):
         self.name = name
         self.piece = piece
 
     def play(self, game):
-        pass
+        ## make random move.
+        avail_acts = game.available_actions_list()
+        move = np.random.choice(avail_acts)
+        return move//game.size, move%game.size
 

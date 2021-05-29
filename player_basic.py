@@ -1,17 +1,5 @@
 import numpy as np
 import gomoku
-
-class RandomPlayer(gomoku.Player):
-    '''Makes random moves.'''
-    def __init__(self, name, piece):
-        super().__init__(name, piece)
-
-    def play(self, game):
-        avail_acts = game.available_actions_list()
-        move = np.random.choice(avail_acts)
-        return move//game.size, move%game.size
-    
-
     
 class FeaturePlayer(gomoku.Player):
     '''Move according to basic features.
@@ -30,17 +18,15 @@ class FeaturePlayer(gomoku.Player):
     
     Variables ===========
     
-        name: string. Name of player.
-        piece: int. Either +1 for black or -1 for white.
-        w: array. Points assigned to each feature. Defaults to pre-assigned points.
+        name (string) ... Name of player.
+        piece (int) ... Either +1 for black or -1 for white.
+        w (array) ... Points assigned to each feature. Defaults to pre-assigned points.
         
     Methods ============
     
-        play(game: Gomoku) -> (x, y)
-            Returns move to play.
+        play(game) ... Given Gomoku game, returns move (x, y) to play.
     
-        get_features(board: array, piece: int) -> array
-            Returns array of features, described above.
+        get_features(board, piece) ... Given board and player piece, returns array of features described above.
     '''
     def __init__(self, name, piece, w=None):
         super().__init__(name, piece)
