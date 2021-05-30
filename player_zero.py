@@ -16,13 +16,14 @@ def net(size, l2=1e-2):
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv3')(x)
     ## policy head
     y = keras.layers.Conv2D(filters=2, kernel_size=(1,1), strides=(1,1), padding='same', activation='relu', 
-                            kernel_regularizer=keras.regularizers.L2(l2), name='pre_policy')(x)
+                            kernel_regularizer=keras.regularizers.L2(l2), name='conv4')(x)
     y = keras.layers.Flatten()(y)
     y = keras.layers.Dense(size*size, activation='softmax', kernel_regularizer=keras.regularizers.L2(l2), name='policy')(y)
     ## value head
     x = keras.layers.Conv2D(filters=1, kernel_size=(1,1), strides=(1,1), padding='same', activation='relu', 
-                            kernel_regularizer=keras.regularizers.L2(l2), name='pre_value')(x)
+                            kernel_regularizer=keras.regularizers.L2(l2), name='conv5')(x)
     x = keras.layers.Flatten()(x)
+    x = keras.layers.Dense(64, activation='relu', kernel_regularizer=keras.regularizers.L2(l2), name='dense1')(x)
     x = keras.layers.Dense(1, activation='tanh', kernel_regularizer=keras.regularizers.L2(l2), name='value')(x)
     
     return keras.Model(input_layer, [y, x])
@@ -32,37 +33,40 @@ def net(size, l2=1e-2):
 class ZeroPlayer(gomoku.Player):
     '''Move according to AlphaGo Zero algorithm.
     
-    Each time 'play()' is called, a game tree with 400 moves is generated using 'expand()'. Each 'expand()' down the 
-    tree picks moves guided by the NN model. These 400 moves form the policy of the current state, and a move
-    is finally selected. At each move, the (board, policy, value) are cached for training the NN model.
+    Each time 'play()' is called, a game tree with 500 moves is generated using 'expand()'. Each 'expand()' 
+    down the tree picks moves guided by a UCB multi-arm bandit algorithm, and previously unvisited states are 
+    evaluated by the NN model. These 500 moves form the policy of the current state, and a move is finally 
+    selected. For each played move, the (board, policy, value) are cached for training the NN model.
     
     Parameters =========
 
-        name: string. Name of player.
-        piece: int. Either +1 for black or -1 for white.
-        game: Gomoku. Instance of new game.
-        model: keras.Model. NN model that guides 'expand()'.
-        recorder: GameRecorder. Object that caches data for NN training. Defaults to 'None', i.e. data not cached.
+        name <string> ... Name of player.
+        piece <int> ... Either +1 for black or -1 for white.
+        game <Gomoku> ... Instance of new game.
+        model <keras.Model> ... NN model that evaluates new states.
+        recorder <GameRecorder> ... Object that caches data for NN training. Defaults to 'None', i.e. data not cached.
+        
+    Variables ============
+    
+        name <string>
+        piece <int>
+        tree <MCTree> ... Game tree.
+        model <keras.Model>
+        recorder <GameRecorder> 
 
     Methods ============
 
-        play(game: Gomoku, n_iter: int) -> (x, y)
-            Returns move to play. 'n_iter' is number of expand() to generate in the game tree. Defaults to 400.
-            
-        update(move: int)
-            Update the game tree by one move, where 'move' = x*size + y.
-            
-        expand()
-            Traverse down game tree and add one node.
+        play(game, n_iter) ... Given Gomoku game, returns move (x, y) to play. 'n_iter' is an integer 
+            number of 'expand()' to generate in the game tree. Defaults to 500.
     '''
     
     def __init__(self, name, piece, game, model, recorder=None):
         super().__init__(name, piece)
-        self.tree = MCTree(piece, game, model)
+        self.tree = MCTree(game, model)
         self.model = model
         self.recorder = recorder
     
-    def play(self, game, n_iter=1000):
+    def play(self, game, n_iter=500):
         ## if needed, update tree with most recent move
         if self.tree.n_moves != len(game.episode):
             x, y = game.episode[-1]
@@ -71,13 +75,13 @@ class ZeroPlayer(gomoku.Player):
         for i in range(n_iter):
             node = self.tree.select()
             self.tree.backup(node)
-        ## compute policy
-        policy, value = self.tree.policy_value()
+        ## compute policy and value
+        policy, value = self.tree.get_policy_value()
         ## save cache
         if self.recorder:
-            self.recorder.write(game.board * self.piece, policy, value)
+            self.recorder.write(game.board * self.piece, policy, value) # always present board with black's move
         ## pick move according to policy
-        move = np.random.choice(game.size*game.size, p=policy)
+        move = np.random.choice(len(policy), p=policy)
         self.tree.updateHead(move)
         x, y = move//game.size, move%game.size
         return x, y
@@ -87,30 +91,24 @@ class ZeroPlayer(gomoku.Player):
 class MCTree:
     ''' Data structure to handle game tree.'''
     
-    def __init__(self, piece, game, model):
-        self.piece = piece
+    def __init__(self, game, model):
+        ## hyperparameters ==========
+        self.c = 4. # controls UCB exploration
+        self.dirichlet = 1.75 # controls dirichlet noise
+        self.epsilon = 0.25 # controls amount of dirichlet noise to add
+        ## ==========================
         self.model = model
         self.head = MCTreeNode(game, None)
         self.evaluate(self.head)
         self.prev_head = None # useful for debugging
         self.n_moves = 0
-        self.laplace = 1. # Laplace smoothing
+        
         
     def pickMove(self, node):
-        ''' Pick move using PUCB algorithm. '''
+        ''' Pick a move using UCB multi-arm bandit algorithm. '''
         assert not node.game.finished, "game is finished"
-        Q = node.Q.copy()
-        Q[node.N == 0] = 1
-        C = np.zeros_like(Q)
-        if node.t > 0:
-            mask = node.N != 0
-            C[mask] = np.sqrt(3*np.log(node.t) / (2*node.N + 1e-6))[mask]
-        M = 2 / (node.P + 1e-6)
-        if node.t > 1:
-            M *= np.sqrt( np.log(node.t)/node.t )
-        UCB = Q + C - M
-        ## forbid moves
-        UCB[node.forbid] = np.min(UCB) - 1
+        UCB = node.Q + self.c * node.P * np.sqrt(1+node.t) / (1+node.N) # UCB = Q + U defined for AlphaGo Zero
+        UCB[node.forbid] = np.min(UCB) - 1 # forbid moves
         return np.argmax(UCB)
         
     def select(self):
@@ -118,7 +116,7 @@ class MCTree:
         node = self.head
         while not node.game.finished:
             move = self.pickMove(node)
-            if move not in node.children: # move has not been explored
+            if move not in node.children: # node has not been explored
                 return self.expand(node, move)
             node = node.children[move]
         return node # node is terminal state
@@ -136,24 +134,34 @@ class MCTree:
         return child
     
     def evaluate(self, node):
-        ''' If game is terminal, assign V = +/- 1. Else, evaluate using NN model. '''
-        if node.game.finished:
-            node.V = node.game.winner * self.piece
-        else:
-            tensor = node.game.board.reshape((1, node.game.size, node.game.size, 1)) * node.game.curr_player
+        ''' Evaluate using NN model. '''
+        if node.game.finished: # game is terminal
+            node.V = 1 # winning state for current player
+        else: # game is not terminal
+            tensor = node.game.board.reshape((1, node.game.size, node.game.size, 1)) \
+                     * node.game.curr_player # always present board with black's move
+
             P, V = self.model(tensor)
-            node.P = P.numpy()[0]
             node.V = V.numpy()[0, 0]
+            node.P = P.numpy()[0]
+            ## add dirichlet noise
+            node.P = (1-self.epsilon)*node.P + self.epsilon*np.random.dirichlet(self.dirichlet*np.ones_like(node.P))
             node.forbid = node.game.forbidden_actions_list()
             
     def backup(self, node):
+        ''' From leaf node, update Q and N of all parents nodes. '''
+        V = node.V
         while node.parent:
-            V = node.V
             move = node.parent_id
             node = node.parent
             node.t += 1
             node.N[move] += 1
-            node.Q[move] += (V - node.Q[move])/node.N[move]
+            if node.N[move] == 1: # if first time, remove optimism
+                node.Q[move] = V 
+            else:
+                node.Q[move] += (V - node.Q[move])/node.N[move]
+            V *= -1 # flip value for opponent
+            
     
     def updateHead(self, move):
         self.n_moves += 1
@@ -167,8 +175,8 @@ class MCTree:
             self.head = self.head.children[move]
             self.head.parent = None
     
-    def policy_value(self):
-        policy = self.head.N + self.laplace * self.head.game.available_actions().flatten()
+    def get_policy_value(self):
+        policy = self.head.N.copy()
         policy /= np.sum(policy)
         return policy, np.sum(policy * self.head.Q)
         
@@ -179,12 +187,12 @@ class MCTreeNode:
     def __init__(self, game, parent):
         self.game = game.copy()
         self.parent = parent
-        self.parent_id = None
+        self.parent_id = None # self = parent.children[parent_id]
         self.children = {}
         self.P = None
         self.V = None
         self.forbid = None
-        self.Q = np.zeros(game.size**2, dtype=np.float32)
+        self.Q = np.ones(game.size**2, dtype=np.float32) # initial optimism to visit every action
         self.N = np.zeros(game.size**2, dtype=np.float32)
         self.t = 0
         

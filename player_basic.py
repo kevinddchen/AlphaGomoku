@@ -16,11 +16,11 @@ class FeaturePlayer(gomoku.Player):
             8: Ones (for bias).
         The 'w' vector assigns points to each feature, and adds them up. Player makes move with maximum points.
     
-    Variables ===========
+    Parameters/Variables ===========
     
-        name (string) ... Name of player.
-        piece (int) ... Either +1 for black or -1 for white.
-        w (array) ... Points assigned to each feature. Defaults to pre-assigned points.
+        name <string> ... Name of player.
+        piece <int> ... Either +1 for black or -1 for white.
+        w <array> ... Points assigned to each feature. Defaults to pre-assigned points.
         
     Methods ============
     

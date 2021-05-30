@@ -5,12 +5,12 @@ class Gomoku:
 
     Parameters ==========
 
-        size (int) ... Dimension of board. Defaults to size=15.
+        size <int> ... Dimension of board. Defaults to size=15.
 
     Variables ===========
 
-        size (int).
-        board (array) ... Numerical representation of the board; 0=empty, 1=black, -1=white.
+        size <int>
+        board <array> ... Numerical representation of the board; 0=empty, 1=black, -1=white.
           
             Uses matrix convention, not Go convention.
                0 1 2 3 x
@@ -20,10 +20,10 @@ class Gomoku:
             3 |_|_|_|_| ...
             y  . . . . 
 
-        episode (list of tuples (x, y)) ... Moves played so far.
-        finished (boolean) ... 'True' if game is finished, 'False' otherwise.
-        winner (int) ... '1' if black won, '-1' if white won, '0' otherwise.
-        curr_player (int) ... Current player.
+        episode <list of tuples (x, y)> ... Moves played so far.
+        finished <boolean> ... 'True' if game is finished, 'False' otherwise.
+        winner <int> ... '1' if black won, '-1' if white won, '0' otherwise.
+        curr_player <int> ... Current player.
 
     Methods =============
 
@@ -141,10 +141,10 @@ class Gomoku:
 class Player:
     '''Basic player interface.
 
-    Parameters =========
+    Parameters/Variables =========
 
-        name (string) ... Name of player.
-        piece (int) ... Either +1 for black or -1 for white.
+        name <string> ... Name of player.
+        piece <int> ... Either +1 for black or -1 for white.
 
     Methods ============
 
