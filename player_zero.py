@@ -214,7 +214,8 @@ class GameRecorder:
         data = recorder.fetch()
     '''
     
-    def __init__(self, filename):
+    def __init__(self, filename, size=9):
+        self.size = size
         self.filename = filename
         self.feature_description = {
             'board': tf.io.FixedLenFeature([], tf.string, default_value=''),
@@ -225,8 +226,8 @@ class GameRecorder:
     def _parse_function(self, example_proto):
         # Parse the input `tf.train.Example` proto using the dictionary `feature_description`.
         dct = tf.io.parse_single_example(example_proto, self.feature_description)
-        board = tf.reshape(tf.io.decode_raw(dct['board'], out_type=tf.int8), (9, 9, 1))
-        policy = tf.reshape(tf.io.decode_raw(dct['policy'], out_type=tf.float32), (81,))
+        board = tf.reshape(tf.io.decode_raw(dct['board'], out_type=tf.int8), (self.size, self.size, 1))
+        policy = tf.reshape(tf.io.decode_raw(dct['policy'], out_type=tf.float32), (self.size**2,))
         return (board, {'policy': policy, 'value': dct['value']})
     
     ## ============================================================================
