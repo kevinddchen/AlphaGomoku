@@ -5,7 +5,7 @@ import tensorflow.keras as keras
 
 import gomoku
 
-def net(size, l2=1e-2):
+def net(size, l2=1e-5):
     ''' Neural network that computes policy and value. '''
     input_layer = keras.Input(shape=(size, size, 1), name='input')
     x = keras.layers.Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu', 
