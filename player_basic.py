@@ -4,7 +4,7 @@ import gomoku
 class FeaturePlayer(gomoku.Player):
     '''Move according to basic features.
     
-        'get_features()' returns a [size, size, 9]-shape array containing 9 features for each position of the board:
+        'get_features()' returns a [size, size, 8]-shape array containing 9 features for each position of the board:
             0: Number of 2-chains the move will create.
             1: "       " 3-chains "                  ".
             2: "       " 4-chains "                  ".
@@ -13,7 +13,6 @@ class FeaturePlayer(gomoku.Player):
             5: "                " 3-chains "                 ".
             6: "                " 4-chains "                 ".
             7: "                " 5-chains "                 ".
-            8: Ones (for bias).
         The 'w' vector assigns points to each feature, and adds them up. Player makes move with maximum points.
     
     Parameters/Variables ===========
@@ -32,7 +31,7 @@ class FeaturePlayer(gomoku.Player):
         super().__init__(name, piece)
         if not w:
             ## default points assigned to each each feature
-            self.w = np.array([1, 3, 9, 81, 1, 3, 9, 27, 0])
+            self.w = np.array([1, 3, 9, 81, 1, 3, 9, 27])
         else:
             self.w = w
         
@@ -52,8 +51,7 @@ class FeaturePlayer(gomoku.Player):
        
     def get_features(self, board, piece):
         size = len(board)
-        features = np.zeros((size, size, 9))
-        features[..., 8] = 1
+        features = np.zeros((size, size, 8))
         for x in range(size):
             for y in range(size):
                 ## left-right

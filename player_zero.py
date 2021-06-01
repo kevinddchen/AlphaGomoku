@@ -6,7 +6,7 @@ import tensorflow.keras as keras
 import gomoku
 
 def net(size, l2=1e-5):
-    ''' Neural network that computes policy and value. '''
+    ''' Neural network f_\theta that computes policy and value. '''
     input_layer = keras.Input(shape=(size, size, 1), name='input')
     x = keras.layers.Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu', 
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv1')(input_layer)
@@ -33,10 +33,13 @@ def net(size, l2=1e-5):
 class ZeroPlayer(gomoku.Player):
     '''Move according to AlphaGo Zero algorithm.
     
-    Each time 'play()' is called, a game tree with 500 moves is generated using 'expand()'. Each 'expand()' 
-    down the tree picks moves guided by a UCB multi-arm bandit algorithm, and previously unvisited states are 
-    evaluated by the NN model. These 500 moves form the policy of the current state, and a move is finally 
-    selected. For each played move, the (board, policy, value) are cached for training the NN model.
+    Each time 'play()' is called, the game tree is simulated n times using 'select()'. Each 'select()' down 
+    the tree picks moves guided by a UCB multi-arm bandit algorithm, until it reaches a terminal or previously 
+    unvisited state. In the latter case, the node is added to the tree with 'expand()' and the prior policy and 
+    value are esimated using 'evaluate()'. 'backup()' propagates the results back up the game tree.
+    
+    After the MCTS simulation, a move is selected from a policy \pi formed by the simulations, according to
+    'get_policy_value()'. For each played move, the (board, policy, value) can be cached for training the NN model.
     
     Parameters =========
 
@@ -56,8 +59,8 @@ class ZeroPlayer(gomoku.Player):
 
     Methods ============
 
-        play(game, n_iter) ... Given Gomoku game, returns move (x, y) to play. 'n_iter' is an integer 
-            number of 'expand()' to generate in the game tree. Defaults to 500.
+        play(game, n_iter) ... Given Gomoku game, returns move (x, y) to play. 
+            'n_iter' is an integer number of 'expand()' to generate in the game tree. Recommended >= 500.
     '''
     
     def __init__(self, name, piece, game, model, recorder=None):
@@ -66,8 +69,8 @@ class ZeroPlayer(gomoku.Player):
         self.model = model
         self.recorder = recorder
     
-    def play(self, game, n_iter=500):
-        ## if needed, update tree with most recent move
+    def play(self, game, n_iter):
+        ## if needed, update game tree with opponent's most recent move
         if self.tree.n_moves != len(game.episode):
             x, y = game.episode[-1]
             self.tree.updateHead(x*game.size + y)
@@ -75,11 +78,11 @@ class ZeroPlayer(gomoku.Player):
         for i in range(n_iter):
             node = self.tree.select()
             self.tree.backup(node)
-        ## compute policy and value
+        ## compute policy and value from the MCTS results
         policy, value = self.tree.get_policy_value()
         ## save cache
         if self.recorder:
-            self.recorder.write(game.board * self.piece, policy, value) # always present board with black's move
+            self.recorder.write(game.board*self.piece, policy, value) # present board with black to move
         ## pick move according to policy
         move = np.random.choice(len(policy), p=policy)
         self.tree.updateHead(move)
@@ -99,16 +102,15 @@ class MCTree:
         ## ==========================
         self.model = model
         self.head = MCTreeNode(game, None)
-        self.evaluate(self.head)
         self.prev_head = None # useful for debugging
-        self.n_moves = 0
-        
+        self.n_moves = len(game.episode) # number of moves played on board (not number of tree simulations)
+        self.evaluate(self.head)
         
     def pickMove(self, node):
         ''' Pick a move using UCB multi-arm bandit algorithm. '''
-        assert not node.game.finished, "game is finished"
+        #assert not node.game.finished, "game is finished"
         UCB = node.Q + self.c * node.P * np.sqrt(1+node.t) / (1+node.N) # UCB = Q + U defined for AlphaGo Zero
-        UCB[node.forbid] = np.min(UCB) - 1 # forbid moves
+        UCB[node.game.forbidden_actions_list()] = np.min(UCB) - 1 # forbid moves
         return np.argmax(UCB)
         
     def select(self):
@@ -122,7 +124,7 @@ class MCTree:
         return node # node is terminal state
     
     def expand(self, parent, move):
-        ''' Add node to game tree and evaluate using NN model. '''
+        ''' Add node to game tree and evaluate it. '''
         child = MCTreeNode(parent.game, parent)
         parent.children[move] = child
         child.parent_id = move
@@ -136,22 +138,22 @@ class MCTree:
     def evaluate(self, node):
         ''' Evaluate using NN model. '''
         if node.game.finished: # game is terminal
-            node.V = 1 # winning state for current player
+            node.V = -1 # if it is your turn and you see a finished board, you have lost
         else: # game is not terminal
             tensor = node.game.board.reshape((1, node.game.size, node.game.size, 1)) \
-                     * node.game.curr_player # always present board with black's move
-
+                     * node.game.curr_player # present board with black to move
             P, V = self.model(tensor)
             node.V = V.numpy()[0, 0]
             node.P = P.numpy()[0]
             ## add dirichlet noise
             node.P = (1-self.epsilon)*node.P + self.epsilon*np.random.dirichlet(self.dirichlet*np.ones_like(node.P))
-            node.forbid = node.game.forbidden_actions_list()
+            #node.forbid = node.game.forbidden_actions_list()
             
     def backup(self, node):
         ''' From leaf node, update Q and N of all parents nodes. '''
         V = node.V
         while node.parent:
+            V *= -1 # flip value each player
             move = node.parent_id
             node = node.parent
             node.t += 1
@@ -160,9 +162,7 @@ class MCTree:
                 node.Q[move] = V 
             else:
                 node.Q[move] += (V - node.Q[move])/node.N[move]
-            V *= -1 # flip value for opponent
             
-    
     def updateHead(self, move):
         self.n_moves += 1
         self.prev_head = self.head
@@ -176,8 +176,7 @@ class MCTree:
             self.head.parent = None
     
     def get_policy_value(self):
-        policy = self.head.N.copy()
-        policy /= np.sum(policy)
+        policy = self.head.N / np.sum(self.head.N)
         return policy, np.sum(policy * self.head.Q)
         
     
@@ -191,37 +190,45 @@ class MCTreeNode:
         self.children = {}
         self.P = None
         self.V = None
-        self.forbid = None
-        self.Q = np.ones(game.size**2, dtype=np.float32) # initial optimism to visit every action
+        #self.forbid = None
+        self.Q = np.ones(game.size**2, dtype=np.float32) # optimism (initialize to 1 to visit every action)
         self.N = np.zeros(game.size**2, dtype=np.float32)
-        self.t = 0
-        
-
-
+        self.t = 0 # t = sum(N)
+      
         
         
 class GameRecorder:
     ''' Custom object to read/write game data as TFRecords file.
     
     To record data:
-        recorder = GameRecorder([filename goes here])
+        recorder = GameRecorder("name_of_file.tfrecords")
         recorder.open()
         [ run games here ]
         recorder.close()
     
     To read data:
-        recorder = GameRecorder([filename goes here])
+        recorder = GameRecorder("name_of_file.tfrecords")
         data = recorder.fetch()
+        
+    'open()' will not to overwrite existing files. This can be overridden by 'GameRecorder(..., overwrite=True)'.
     '''
     
-    def __init__(self, filename, size=9):
+    def __init__(self, filename, size, overwrite=False):
         self.size = size
         self.filename = filename
+        self.overwrite = overwrite
         self.feature_description = {
             'board': tf.io.FixedLenFeature([], tf.string, default_value=''),
             'policy': tf.io.FixedLenFeature([], tf.string, default_value=''),
             'value': tf.io.FixedLenFeature([], tf.float32, default_value=0.0),
             }
+        
+    def __enter__(self, **kwargs):
+        self.open(**kwargs)
+        return self
+   
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.writer.close()
     
     def _parse_function(self, example_proto):
         # Parse the input `tf.train.Example` proto using the dictionary `feature_description`.
@@ -244,8 +251,8 @@ class GameRecorder:
         return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
     ## ============================================================================
         
-    def open(self, overwrite=False):
-        assert overwrite or not os.path.exists(self.filename), "file already exists"
+    def open(self):
+        assert self.overwrite or not os.path.exists(self.filename), "file already exists"
         self.writer = tf.io.TFRecordWriter(self.filename)
         
     def write(self, board, policy, value):
@@ -261,10 +268,17 @@ class GameRecorder:
         self.writer.close()
     
     def fetch(self):
+        assert os.path.exists(self.filename), "file does not exist"
         return tf.data.TFRecordDataset(self.filename).map(self._parse_function)
     
-
     
 
+class PrintRecorder:
+    ''' Does not cache data; just prints it'''
+    def write(self, board, policy, value):
+        print("board:", board)
+        print("policy:", policy)
+        print("value:", value)
+          
 
     

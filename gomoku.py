@@ -6,10 +6,12 @@ class Gomoku:
     Parameters ==========
 
         size <int> ... Dimension of board. Defaults to size=15.
+        win <int> ... Number of stones in a chain to win. Defaults to win=5.
 
     Variables ===========
 
         size <int>
+        win <int>
         board <array> ... Numerical representation of the board; 0=empty, 1=black, -1=white.
           
             Uses matrix convention, not Go convention.
@@ -44,8 +46,9 @@ class Gomoku:
         copy() ... Returns copied instance of Gomoku game.
     '''
 
-    def __init__(self, size=15):
+    def __init__(self, size=15, win=5):
         self.size = size
+        self.win = win
         self.board = np.zeros((size, size), dtype=np.int8)
         self.episode = []
         self.finished = False
@@ -85,22 +88,22 @@ class Gomoku:
         i, j = 0, 0
         while x-i-1 >= 0 and self.board[x-i-1, y] == piece: i += 1
         while x+j+1 < self.size and self.board[x+j+1, y] == piece: j += 1
-        if i+j+1 >= 5: return piece
+        if i+j+1 >= self.win: return piece
         ## up-down
         i, j = 0, 0
         while y-i-1 >= 0 and self.board[x, y-i-1] == piece: i += 1
         while y+j+1 < self.size and self.board[x, y+j+1] == piece: j += 1
-        if i+j+1 >= 5: return piece
+        if i+j+1 >= self.win: return piece
         ## NW-SE
         i, j = 0, 0
         while x-i-1 >= 0 and y-i-1 >= 0 and self.board[x-i-1, y-i-1] == piece: i += 1
         while x+j+1 < self.size and y+j+1 < self.size and self.board[x+j+1, y+j+1] == piece: j += 1
-        if i+j+1 >= 5: return piece
+        if i+j+1 >= self.win: return piece
         ## NE-SW
         i, j = 0, 0
         while x+i+1 < self.size and y-i-1 >= 0 and self.board[x+i+1, y-i-1] == piece: i += 1
         while x-j-1 >= 0 and y+j+1 < self.size and self.board[x-j-1, y+j+1] == piece: j += 1
-        if i+j+1 >= 5: return piece
+        if i+j+1 >= self.win: return piece
         return 0
 
     def show(self):
@@ -128,8 +131,8 @@ class Gomoku:
             print()
             
     def copy(self):
-        new_game = Gomoku(self.size)
-        new_game.board = np.copy(self.board)
+        new_game = Gomoku(size=self.size, win=self.win)
+        new_game.board = self.board.copy()
         new_game.episode = self.episode[:]
         new_game.finished = self.finished
         new_game.winner = self.winner
