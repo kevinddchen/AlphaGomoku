@@ -1,0 +1,19 @@
+day0:
+200 games -> 5,363 samples -> 42,904 augmented samples
+train 30 epochs on day0 (42,904 samples)
+
+day1:
+200 games -> 5,683 samples -> 45,464 augmented samples
+train 30 epochs on day0+1 (88,368 samples)
+
+day2:
+200 games -> 5,626 samples -> 45,008 augmented samples
+train 15 epochs on day0+1+2 (133,376 samples)
+
+day3:
+200 games -> 5,474 samples -> 43,792 augmented samples 
+train 15 epochs on dat1+2+3 (134,264 samples)
+
+day4:
+200 games -> 5,225 -> 41,800 augmented samples
+train 15 epochs on dat2+3+4 (130,600 samples)
