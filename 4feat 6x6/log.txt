@@ -1,0 +1,42 @@
+n_iter=500
+
+TRAINING ================================================
+
+day0:
+1,500 games -> 21,470 samples -> 171,760 augmented samples
+train 20 epochs. policy_loss: 0.0880. value_loss: 0.0031
+
+day1:
+1,500 games -> 17,561 samples -> 140,488 augmented samples
+train 20 epochs. policy_loss: 0.0805. value_loss: 0.0258
+
+day2:
+1,500 games -> 17,437 samples -> 139,496 augmented samples
+train 20 epochs. policy_loss: 0.0713. value_loss: 0.0319
+
+day3:
+1,500 games -> 16,249 samples -> 129,992 augmented samples
+train 20 epochs. policy_loss: 0.0624. value_loss: 0.0318
+
+day4:
+1,500 games -> 15,908 samples -> 127,264 augmented samples
+train 20 epochs.
+
+TESTING =================================================
+
+(temp = .1)
+day1 vs day0: Black 8W 2L, White 10W 0L
+
+day2 vs day0: Black 10W 0L, White 10W 0L
+day2 vs day1: Black 9W 1L, White 10W 0L
+
+day3 vs day1: Black 10W 0L, White 10W 0L
+day3 vs day2: Black 10W 0L, White 5W 5L
+
+(temp = .5)
+day4 vs day2: Black 9W 1L, White 5W 5L
+day4 vs day3: Black 10W 0L, White 2W 8L
+
+day5 vs day2: Black 10W 0L, White 8W 2L
+day5 vs day3: Black 10W 0L, White 0W 10L
+day5 vs day4: Black 9W 1L, White 0W 10L

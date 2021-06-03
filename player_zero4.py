@@ -10,7 +10,7 @@ def softmax(x):
     probs /= np.sum(probs)
     return probs
 
-def net(size, l2=1e-4):
+def net(size, l2=1e-6):
     ''' Neural network f_\theta that computes policy and value. '''
     input_layer = keras.Input(shape=(size, size, 4), name='input')
     x = keras.layers.Conv2D(filters=32, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu', 
@@ -111,7 +111,7 @@ class MCTree:
         self.c = 4. # controls UCB exploration
         self.dirichlet = .3 # controls dirichlet noise
         self.epsilon = .25 # controls amount of dirichlet noise to add
-        self.temp = .1 # controls exploration of output policy
+        self.temp = 1. # controls exploration of output policy
         ## ==========================
         self.model = model
         self.head = MCTreeNode(game, None)
@@ -248,11 +248,11 @@ class GameRecorder:
             'value': tf.io.FixedLenFeature([], tf.float32, default_value=0.0),
             }
         
-    def __enter__(self, **kwargs):
-        self.open(**kwargs)
+    def __enter__(self):
+        self.open()
         return self
    
-    def __exit__(self, exception_type, exception_value, traceback):
+    def __exit__(self, *args):
         self.writer.close()
     
     def _parse_function(self, example_proto):
@@ -300,6 +300,13 @@ class GameRecorder:
 
 class PrintRecorder:
     ''' Does not cache data; just prints it'''
+    
+    def __enter__(self):
+        return self
+   
+    def __exit__(self, *args):
+        pass
+        
     def write(self, board, policy, value):
         print("board[0]:\n", board[..., 0])
         print("board[1]:\n", board[..., 1])
