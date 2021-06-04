@@ -5,6 +5,11 @@ import tensorflow.keras as keras
 
 import gomoku
 
+def softmax(x):
+    probs = np.exp(x - np.max(x))
+    probs /= np.sum(probs)
+    return probs
+
 def net(size, l2=1e-5):
     ''' Neural network f_\theta that computes policy and value. '''
     input_layer = keras.Input(shape=(size, size, 1), name='input')
@@ -99,6 +104,7 @@ class MCTree:
         self.c = 4. # controls UCB exploration
         self.dirichlet = 1.75 # controls dirichlet noise
         self.epsilon = 0.25 # controls amount of dirichlet noise to add
+        self.temp = 1. # controls exploration of output policy
         ## ==========================
         self.model = model
         self.head = MCTreeNode(game, None)
@@ -109,7 +115,7 @@ class MCTree:
     def pickMove(self, node):
         ''' Pick a move using UCB multi-arm bandit algorithm. '''
         #assert not node.game.finished, "game is finished"
-        UCB = node.Q + self.c * node.P * np.sqrt(1+node.t) / (1+node.N) # UCB = Q + U defined for AlphaGo Zero
+        UCB = node.Q + self.c * node.P * np.sqrt(max(1, node.t)) / (1+node.N) # UCB = Q + U defined for AlphaGo Zero
         UCB[node.game.forbidden_actions_list()] = np.min(UCB) - 1 # forbid moves
         return np.argmax(UCB)
         
@@ -147,7 +153,6 @@ class MCTree:
             node.P = P.numpy()[0]
             ## add dirichlet noise
             node.P = (1-self.epsilon)*node.P + self.epsilon*np.random.dirichlet(self.dirichlet*np.ones_like(node.P))
-            #node.forbid = node.game.forbidden_actions_list()
             
     def backup(self, node):
         ''' From leaf node, update Q and N of all parents nodes. '''
@@ -164,6 +169,7 @@ class MCTree:
                 node.Q[move] += (V - node.Q[move])/node.N[move]
             
     def updateHead(self, move):
+        ''' Update head by one move. '''
         self.n_moves += 1
         self.prev_head = self.head
         if move not in self.head.children: # move has not been explored
@@ -175,8 +181,12 @@ class MCTree:
             self.head = self.head.children[move]
             self.head.parent = None
     
+#     def get_policy_value(self):
+#         policy = self.head.N / np.sum(self.head.N)
+#         return policy, np.sum(policy * self.head.Q)
+    
     def get_policy_value(self):
-        policy = self.head.N / np.sum(self.head.N)
+        policy = softmax(np.log(self.head.N + 1e-10) / self.temp).astype(np.float32)
         return policy, np.sum(policy * self.head.Q)
         
     
@@ -223,11 +233,11 @@ class GameRecorder:
             'value': tf.io.FixedLenFeature([], tf.float32, default_value=0.0),
             }
         
-    def __enter__(self, **kwargs):
-        self.open(**kwargs)
+    def __enter__(self):
+        self.open()
         return self
    
-    def __exit__(self, exception_type, exception_value, traceback):
+    def __exit__(self, *args):
         self.writer.close()
     
     def _parse_function(self, example_proto):
@@ -275,6 +285,13 @@ class GameRecorder:
 
 class PrintRecorder:
     ''' Does not cache data; just prints it'''
+    
+    def __enter__(self):
+        return self
+   
+    def __exit__(self, *args):
+        pass
+    
     def write(self, board, policy, value):
         print("board:", board)
         print("policy:", policy)
