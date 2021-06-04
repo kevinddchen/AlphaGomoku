@@ -1,0 +1,9 @@
+n_iter = 500, l2=1e-8
+
+day 0:
+1,500 games -> 40,658 samples -> 325,264 augmented samples
+train 10 epochs. policy_loss: 0.0695. value_loss: 0.0035
+
+day1:
+1,500 games -> 38,838 samples -> 310,704 augmented samples
+train 10 epochs. policy_loss: 0.0635. value_loss: 0.0129
