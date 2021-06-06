@@ -144,7 +144,10 @@ class MCTree:
     def evaluate(self, node):
         ''' Evaluate using NN model. '''
         if node.game.finished: # game is terminal
-            node.V = -1 # if it is your turn and you see a finished board, you have lost
+            if node.game.winner == 0:
+                node.V = 0 # game is tied
+            else:
+                node.V = -1 # if it is your turn and you see a finished board, you have lost
         else: # game is not terminal
             tensor = node.game.board.reshape((1, node.game.size, node.game.size, 1)) \
                      * node.game.curr_player # present board with black to move
