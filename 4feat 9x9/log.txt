@@ -1,55 +1,45 @@
 n_iter=500, l2=1e-12
 
+
+=============================================================
 === TRAINING ================================================
+=============================================================
 
-(temp = 1.0)
+train at temp = 1.0
 
-day0:
-800 games -> 26,607 samples -> 212,856 augmented samples
-train 10 epochs. policy_loss: 0.0499. value_loss: 6.0587e-04
+day0: 800 games -> 212,856 samples. 10 epochs. policy_loss: 0.0499. value_loss: 6.0587e-04
+day1: 750 games -> 170,792 samples. 20 epochs. policy_loss: 0.0464. value_loss: 0.0164
+day2: 750 games -> 135,208 samples. 20 epochs. policy_loss: 0.0405. value_loss: 0.0146
+day3: 750 games -> 128,408 samples. 20 epochs. policy_loss: 0.0358. value_loss: 0.0147
+day4: 750 games -> 129,784 samples. 20 epochs. policy_loss: 0.0331. value_loss: 0.0140
+day5: 750 games -> 128,776 samples. 20 epochs. policy_loss: 0.0309. value_loss: 0.0137
+day6: 750 games -> 131,424 samples. 20 epochs. policy_loss: 0.0297. value_loss: 0.0130
+--- FIXED BUG WHERE TIES COUNTED AS BLACK WINS ---
+day7: 750 games -> 128,912 samples. 20 epochs. policy_loss: 0.0289. value_loss: 0.0120
+day8: 750 games -> 132,016 samples. 20 epochs. policy_loss: 0.0285. value_loss: 0.0120
+day9: 750 games -> 133,088 samples. 20 epochs.
 
-day1:
-750 games -> 21,349 samples -> 170,792 augmented samples
-train 20 epochs. policy_loss: 0.0464. value_loss: 0.0164
-
-day2:
-750 games -> 16,901 samples -> 135,208 augmented samples
-train 20 epochs. policy_loss: 0.0405. value_loss: 0.0146
-
-day3:
-750 games -> 16,051 samples -> 128,408 augmented samples
-train 20 epochs. policy_loss: 0.0358. value_loss: 0.0147
-
-day4:
-750 games -> 16,223 samples -> 129,784 augmented samples
-train 20 epochs. policy_loss: 0.0331. value_loss: 0.0140
-
-day5:
-750 games -> 16,097 samples -> 128,776 augmented samples
-train 20 epochs. policy_loss: 0.0309. value_loss: 0.0137
-
-day6:
-750 games -> 16,428 samples -> 131,424 augmented samples
-train 20 epochs. policy_loss: 0.0297. value_loss: 0.0130
-
+=============================================================
 === TESTING =================================================
+=============================================================
 
-10 games played as black and as white
+test at temp = 0.1
+10 games as black, 10 games as white
 FP = FeaturePlayer
 
-(temp = .1)   |  Black    |  White
+              |  Black    |  White
 --------------------------------------
 day1 vs day0  |  9W 1L    |  10W 0L
               |           |
-day2 vs day0  |  10W 0L   |  10W 0L
+day2 vs day0  |  10W 0L   |  10W 0L     ... day2 on par with FP 
 day2 vs day1  |  9W 1L    |  10W 0L
-day2 vs FP    |  4W 6L    |  5W 4L      ... day2 is on par with FP
+day2 vs FP    |  4W 6L    |  5W 4L
               |           |
 day3 vs day1  |  10W 0L   |  10W 0L
 day3 vs day2  |  6W 3L    |  8W 1L
 day3 vs FP    |  8W 1L    |  7W 1L
               |           |
-day4 vs day2  |  9W 0L    |  9W 1L
+day4 vs day2  |  9W 0L    |  9W 1L      ... decent models starting day4
 day4 vs day3  |  6W 2L    |  7W 2L
 day4 vs FP    |  7W 0L    |  7W 1L
               |           |
@@ -58,18 +48,39 @@ day5 vs day3  |  10W 0L   |  9W 1L
 day5 vs day4  |  7W 1L    |  4W 5L
 day5 vs FP    |  9W 0L    |  9W 0L   
               |           |
-day6 vs day2  |  9W 0L    |  9W 0L
+day6 vs day2  |  9W 0L    |  9W 0L      ... white starts to underperform (related to bug)
 day6 vs day3  |  8W 1L    |  7W 2L
-day6 vs day4  |  5W 2L    |  3W 4L      <-- 
+day6 vs day4  |  5W 2L    |  3W 4L      
 day6 vs day5  |  9W 1L    |  4W 5L        
-day6 vs FP    |  8W 0L    |  5W 1L      <-- suggests day6 is a weak player 
+day6 vs FP    |  8W 0L    |  5W 1L
               |           |
 day7 vs day3  |  10W 0L   |  9W 1L
 day7 vs day4  |  7W 1L    |  7W 0L
 day7 vs day5  |  4W 5L    |  5W 4L
-day7 vs day6  |  5W 3L    |  2W 4L      <-- ???
+day7 vs day6  |  5W 3L    |  2W 4L
 day7 vs FP    |  9W 1L    |  7W 0L
-
-
+              |           |
+--- FIXED BUG WHERE TIES COUNTED AS BLACK WINS ---
+              |           |
+day8 vs day4  |  7W 1L    |  5W 1L
+day8 vs day5  |  8W 1L    |  3W 5L
+day8 vs day6  |  9W 1L    |  1W 4L
+day8 vs day7  |  5W 2L    |  6W 2L
+day8 vs FP    |  9W 0L    |  5W 0L
+              |           |
+day9 vs day4  |  6W 0L    |  7W 1L 
+day9 vs day5  |  8W 1L    |  3W 5L
+day9 vs day6  |  6W 0L    |  3W 4L
+day9 vs day7  |  8W 0L    |  2W 8L
+day9 vs day8  |  6W 2L    |  2W 5L
+day9 vs FP    |  9W 0L    |  6W 0L 
+              |           |
+day10 vs day4 |  5W 1L    |  4W 3L      
+day10 vs day5 |  9W 1L    |  3W 6L
+day10 vs day6 |  9W 0L    |  2W 4L
+day10 vs day7 |  10W 0L   |  2W 8L
+day10 vs day8 |  10W 0L   |  1W 5L 
+day10 vs day9 |  8W 0L    |  0W 8L
+day10 vs FP   |  8W 0L    |  6W 0L 
 
 
