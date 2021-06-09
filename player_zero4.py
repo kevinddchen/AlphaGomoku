@@ -10,6 +10,10 @@ def softmax(x):
     probs /= np.sum(probs)
     return probs
 
+## =========================
+## Neural network model
+## =========================
+
 def net(size, l2=1e-6):
     ''' Neural network f_\theta that computes policy and value. '''
     input_layer = keras.Input(shape=(size, size, 4), name='input')
@@ -33,7 +37,9 @@ def net(size, l2=1e-6):
     
     return keras.Model(input_layer, [y, x])
     
-
+## =========================
+## AlphaGo Zero Player
+## =========================
     
 class ZeroPlayer(gomoku.Player):
     '''Move according to AlphaGo Zero algorithm.
@@ -59,6 +65,7 @@ class ZeroPlayer(gomoku.Player):
         game <Gomoku> ... Instance of new game.
         model <keras.Model> ... NN model that evaluates new states.
         recorder <GameRecorder> ... Object that caches data for NN training. Defaults to 'None', i.e. data not cached.
+        n_iter <int> ... Number of simulations for MCTS.
         
     Variables ============
     
@@ -67,26 +74,27 @@ class ZeroPlayer(gomoku.Player):
         tree <MCTree> ... Game tree.
         model <keras.Model>
         recorder <GameRecorder> 
+        n_iter <int>
 
     Methods ============
 
-        play(game, n_iter) ... Given Gomoku game, returns move (x, y) to play. 
-            'n_iter' is an integer number of 'expand()' to generate in the game tree. 
+        play(game) ... Given Gomoku game, returns move (x, y) to play.
     '''
     
-    def __init__(self, name, piece, game, model, recorder=None):
+    def __init__(self, name, piece, game, model, n_iter, recorder=None):
         super().__init__(name, piece)
         self.tree = MCTree(game, model)
         self.model = model
+        self.n_iter = n_iter
         self.recorder = recorder
     
-    def play(self, game, n_iter):
+    def play(self, game):
         ## if needed, update game tree with opponent's most recent move
         if self.tree.n_moves != len(game.episode):
             x, y = game.episode[-1]
             self.tree.updateHead(x*game.size + y)
         ## do MC tree search
-        for i in range(n_iter):
+        for i in range(self.n_iter):
             node = self.tree.select()
             self.tree.backup(node)
         ## compute policy and value from the MCTS results
@@ -100,8 +108,6 @@ class ZeroPlayer(gomoku.Player):
         self.tree.updateHead(move)
         x, y = move//game.size, move%game.size
         return x, y
-        
-        
         
 class MCTree:
     ''' Data structure to handle game tree.'''
@@ -208,8 +214,6 @@ class MCTree:
             tensor[..., 3] = 1
         return tensor
         
-    
-    
 class MCTreeNode:
     
     def __init__(self, game, parent):
@@ -222,8 +226,10 @@ class MCTreeNode:
         self.Q = np.ones(game.size**2, dtype=np.float32) # optimism (initialize to 1 to visit every action)
         self.N = np.zeros(game.size**2, dtype=np.float32)
         self.t = 0 # t = sum(N)
-      
-        
+    
+## =========================
+## Misc. methods
+## =========================
         
 class GameRecorder:
     ''' Custom object to read/write game data as TFRecords file.

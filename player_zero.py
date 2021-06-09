@@ -10,6 +10,10 @@ def softmax(x):
     probs /= np.sum(probs)
     return probs
 
+## =========================
+## Neural network model
+## =========================
+
 def net(size, l2=1e-5):
     ''' Neural network f_\theta that computes policy and value. '''
     input_layer = keras.Input(shape=(size, size, 1), name='input')
@@ -17,15 +21,15 @@ def net(size, l2=1e-5):
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv1')(input_layer)
     x = keras.layers.Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu', 
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv2')(x)
-    x = keras.layers.Conv2D(filters=64, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu', 
+    x = keras.layers.Conv2D(filters=128, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu', 
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv3')(x)
     ## policy head
-    y = keras.layers.Conv2D(filters=2, kernel_size=(1,1), strides=(1,1), padding='same', activation='relu', 
+    y = keras.layers.Conv2D(filters=4, kernel_size=(1,1), strides=(1,1), padding='same', activation='relu', 
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv4')(x)
     y = keras.layers.Flatten()(y)
     y = keras.layers.Dense(size*size, activation='softmax', kernel_regularizer=keras.regularizers.L2(l2), name='policy')(y)
     ## value head
-    x = keras.layers.Conv2D(filters=1, kernel_size=(1,1), strides=(1,1), padding='same', activation='relu', 
+    x = keras.layers.Conv2D(filters=2, kernel_size=(1,1), strides=(1,1), padding='same', activation='relu', 
                             kernel_regularizer=keras.regularizers.L2(l2), name='conv5')(x)
     x = keras.layers.Flatten()(x)
     x = keras.layers.Dense(64, activation='relu', kernel_regularizer=keras.regularizers.L2(l2), name='dense1')(x)
@@ -33,7 +37,9 @@ def net(size, l2=1e-5):
     
     return keras.Model(input_layer, [y, x])
     
-
+## =========================
+## AlphaGo Zero Player
+## =========================
     
 class ZeroPlayer(gomoku.Player):
     '''Move according to AlphaGo Zero algorithm.
@@ -53,6 +59,7 @@ class ZeroPlayer(gomoku.Player):
         game <Gomoku> ... Instance of new game.
         model <keras.Model> ... NN model that evaluates new states.
         recorder <GameRecorder> ... Object that caches data for NN training. Defaults to 'None', i.e. data not cached.
+        n_iter <int> ... Number of simulations for MCTS.
         
     Variables ============
     
@@ -61,26 +68,27 @@ class ZeroPlayer(gomoku.Player):
         tree <MCTree> ... Game tree.
         model <keras.Model>
         recorder <GameRecorder> 
+        n_iter <int>
 
     Methods ============
 
-        play(game, n_iter) ... Given Gomoku game, returns move (x, y) to play. 
-            'n_iter' is an integer number of 'expand()' to generate in the game tree. Recommended >= 500.
+        play(game) ... Given Gomoku game, returns move (x, y) to play. 
     '''
     
-    def __init__(self, name, piece, game, model, recorder=None):
+    def __init__(self, name, piece, game, model, n_iter, recorder=None):
         super().__init__(name, piece)
         self.tree = MCTree(game, model)
         self.model = model
+        self.n_iter = n_iter
         self.recorder = recorder
     
-    def play(self, game, n_iter):
+    def play(self, game):
         ## if needed, update game tree with opponent's most recent move
         if self.tree.n_moves != len(game.episode):
             x, y = game.episode[-1]
             self.tree.updateHead(x*game.size + y)
         ## do MC tree search
-        for i in range(n_iter):
+        for i in range(self.n_iter):
             node = self.tree.select()
             self.tree.backup(node)
         ## compute policy and value from the MCTS results
@@ -93,8 +101,6 @@ class ZeroPlayer(gomoku.Player):
         self.tree.updateHead(move)
         x, y = move//game.size, move%game.size
         return x, y
-        
-        
         
 class MCTree:
     ''' Data structure to handle game tree.'''
@@ -156,6 +162,7 @@ class MCTree:
             node.P = P.numpy()[0]
             ## add dirichlet noise
             node.P = (1-self.epsilon)*node.P + self.epsilon*np.random.dirichlet(self.dirichlet*np.ones_like(node.P))
+            #node.forbid = node.game.forbidden_actions_list()
             
     def backup(self, node):
         ''' From leaf node, update Q and N of all parents nodes. '''
@@ -166,13 +173,12 @@ class MCTree:
             node = node.parent
             node.t += 1
             node.N[move] += 1
-            if node.N[move] == 1: # if first time, remove optimism
-                node.Q[move] = V 
-            else:
-                node.Q[move] += (V - node.Q[move])/node.N[move]
+            #if node.N[move] == 1: # if first time, remove optimism
+            #    node.Q[move] = V 
+            #else:
+            node.Q[move] += (V - node.Q[move])/node.N[move]
             
     def updateHead(self, move):
-        ''' Update head by one move. '''
         self.n_moves += 1
         self.prev_head = self.head
         if move not in self.head.children: # move has not been explored
@@ -184,15 +190,9 @@ class MCTree:
             self.head = self.head.children[move]
             self.head.parent = None
     
-#     def get_policy_value(self):
-#         policy = self.head.N / np.sum(self.head.N)
-#         return policy, np.sum(policy * self.head.Q)
-    
     def get_policy_value(self):
         policy = softmax(np.log(self.head.N + 1e-10) / self.temp).astype(np.float32)
         return policy, np.sum(policy * self.head.Q)
-        
-    
     
 class MCTreeNode:
     
@@ -204,11 +204,13 @@ class MCTreeNode:
         self.P = None
         self.V = None
         #self.forbid = None
-        self.Q = np.ones(game.size**2, dtype=np.float32) # optimism (initialize to 1 to visit every action)
+        self.Q = np.zeros(game.size**2, dtype=np.float32) # optimism (initialize to 1 to visit every action)
         self.N = np.zeros(game.size**2, dtype=np.float32)
         self.t = 0 # t = sum(N)
-      
-        
+    
+## =========================
+## Misc. methods
+## =========================   
         
 class GameRecorder:
     ''' Custom object to read/write game data as TFRecords file.
