@@ -1,6 +1,6 @@
 # Gomoku-project
 
-For detailed report, see <a href=https://github.com/kevinddchen/Gomoku-project/blob/main/report.pdf>report.pdf</a>.
+For details, see <a href=https://github.com/kevinddchen/Gomoku-project/blob/main/report.pdf>report.pdf</a>.
 
 Interactive notebooks: guaranteed to run with Python 3.8 and TensorFlow 2.5
  - <a href=https://github.com/kevinddchen/Gomoku-project/blob/main/playtest.ipynb>playtest.ipynb</a> ... lets you playtest our models.
